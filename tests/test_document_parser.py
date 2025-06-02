@@ -42,3 +42,40 @@ async def test_save_document():
     mock_file_repository.create_file.assert_called_once_with(mock_session, file)
     mock_vector_store.add_documents.assert_awaited_once()
     assert saved_file == file
+
+@pytest.mark.asyncio
+async def test_search_documents():
+    
+    # --- Setup ---
+    mock_vector_store = AsyncMock()
+
+    # Fake document returned by the similarity search
+    expected_docs = [Document(page_content="Relevant content", metadata={"file_id": str(uuid4())})]
+    mock_vector_store.similarity_search.return_value = expected_docs
+
+    # Create service with only the dependency you need
+    service = DocumentService(
+        vector_store=mock_vector_store,
+        text_splitter=None,       # Not used here
+        file_repository=None,     # Not used here
+    )
+
+    # --- Case 1: With file_ids ---
+    file_id_1 = uuid4()
+    file_id_2 = uuid4()
+    query = "test query"
+    results = await service.search(query, file_ids=[file_id_1, file_id_2])
+
+    # Check correct arguments passed to the vector store
+    mock_vector_store.similarity_search.assert_awaited_with(
+        query,
+        filter={"file_id": {"$in": [str(file_id_1), str(file_id_2)]}},
+    )
+    assert results == expected_docs
+
+    # --- Case 2: Without file_ids ---
+    mock_vector_store.similarity_search.reset_mock()
+    results = await service.search(query)
+
+    mock_vector_store.similarity_search.assert_awaited_with(query, filter=None)
+    assert results == expected_docs

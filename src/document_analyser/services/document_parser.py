@@ -7,6 +7,7 @@ import tempfile
 from sqlmodel import Session
 from document_analyser.models.file import File
 from document_analyser.repository.file import FileRepository
+from uuid import UUID
 
 @dataclass
 class DocumentService:
@@ -34,6 +35,22 @@ class DocumentService:
 
         return file
     
+    async def search(self, text: str, file_ids: list[UUID] = []) -> list[Document]:
+        """
+        Search for documents in the vector store.
+
+        Args:
+            text (str): The search query.
+            file_ids (list[UUID]): Optional list of file IDs to filter results.
+
+        Returns:
+            list[Document]: A list of documents matching the search query.
+        """
+        document_filter = None
+        if file_ids:
+            document_filter = {"file_id": {"$in": [str(file_id) for file_id in file_ids]}}
+        return await self.vector_store.similarity_search(text, filter=document_filter) 
+        
     def __add_metadata_to_documents(self, documents: list[Document], file: File) -> None:
         """
         Add metadata to documents.
